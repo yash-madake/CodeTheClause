@@ -1,4 +1,3 @@
-from google import genai
 import os
 from datetime import datetime
 from gtts import gTTS
@@ -6,13 +5,13 @@ import playsound
 import uuid
 import time
 import re
+import requests  # NEW: for calling Ollama HTTP API
 
 # ================= CONFIG =================
-MODEL_NAME = "gemini-2.5-flash"
-MAX_TURNS = 6
-COOLDOWN_SECONDS = 1.2
-
-client = genai.Client()  # Reads GEMINI_API_KEY automatically
+MODEL_NAME = "qwen3:4b-instruct"   # Ollama model name
+MAX_TURNS = 4                      # keep context short and light
+COOLDOWN_SECONDS = 1.0
+MAX_CHARS_PER_TURN = 600           # cap stored text per turn
 
 SYSTEM_INSTRUCTION = """
 You are a Senior Care Assistant chatbot called 'SeniorCare Ally'.
@@ -33,6 +32,9 @@ Rules:
 
 Style:
 - Respectful, supportive, non-judgmental.
+- Keep answers brief: 3–5 short sentences.
+- Do not use bullet points or lists; write in plain sentences.
+- Always finish your sentences before stopping.
 """
 
 # ================= LANGUAGE =================
@@ -46,7 +48,7 @@ LANGUAGE_MAP = {
     "gujarati": "gu",
     "kannada": "kn",
     "malayalam": "ml",
-    "punjabi": "pa"
+    "punjabi": "pa",
 }
 
 LANGUAGE_INSTRUCTION_MAP = {
@@ -59,7 +61,7 @@ LANGUAGE_INSTRUCTION_MAP = {
     "gu": "Respond only in simple Gujarati.",
     "kn": "Respond only in simple Kannada.",
     "ml": "Respond only in simple Malayalam.",
-    "pa": "Respond only in simple Punjabi."
+    "pa": "Respond only in simple Punjabi.",
 }
 
 FALLBACK_MESSAGES = {
@@ -72,26 +74,17 @@ FALLBACK_MESSAGES = {
     "gu": "હું થોડા સમય માટે વિરામ લઈ રહ્યો છું. કૃપા કરીને થોડા સમય પછી ફરી પ્રયત્ન કરો.",
     "kn": "ನಾನು ಸ್ವಲ್ಪ ವಿರಾಮ ತೆಗೆದುಕೊಳ್ಳುತ್ತಿದ್ದೇನೆ. ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಸಮಯದ ನಂತರ ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
     "ml": "ഞാൻ അല്പസമയം ഇടവേള എടുക്കുന്നു. ദയവായി കുറച്ച് സമയത്തിന് ശേഷം വീണ്ടും ശ്രമിക്കുക.",
-    "pa": "ਮੈਂ ਥੋੜ੍ਹੀ ਦੇਰ ਲਈ ਰੁਕ ਰਿਹਾ ਹਾਂ। ਕਿਰਪਾ ਕਰਕੇ ਕੁਝ ਸਮੇਂ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।"
+    "pa": "ਮੈਂ ਥੋੜ੍ਹੀ ਦੇਰ ਲਈ ਰੁਕ ਰਿਹਾ ਹਾਂ। ਕਿਰਪਾ ਕਰਕੇ ਕੁਝ ਸਮੇਂ ਬਾਅਦ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ।",
 }
 
-# ================= SPEECH CLEANER =================
+# ================= HELPERS =================
 def clean_for_speech(text):
-    # Remove markdown, symbols, bullets
     text = re.sub(r'[*#_`~>|<={}\[\]();]', '', text)
-
-    # Replace colons with pauses
     text = text.replace(":", ".")
-
-    # Remove stray dashes
     text = text.replace("-", " ")
-
-    # Normalize whitespace
     text = re.sub(r'\s+', ' ', text)
-
     return text.strip()
 
-# ================= TEXT TO SPEECH =================
 def speak_text(text, lang_code):
     try:
         clean_text = clean_for_speech(text)
@@ -103,57 +96,61 @@ def speak_text(text, lang_code):
     except Exception:
         pass  # TTS should never crash the app
 
-# ================= CONTEXT =================
-def build_context(history, user_message):
-    contents = []
-    for turn in history:
-        contents.append({
-            "role": turn["role"],
-            "parts": [{"text": turn["text"]}],
-        })
-    contents.append({
-        "role": "user",
-        "parts": [{"text": user_message}],
-    })
-    return contents
+def safe_text(text):
+    if not text:
+        return ""
+    return text[:MAX_CHARS_PER_TURN]
 
-# ================= GEMINI =================
+# ================= GEMINI REPLACED BY OLLAMA =================
 def ask_senior_care_bot(history, user_message, lang_code):
+    # keep only last MAX_TURNS messages in memory
     if len(history) > MAX_TURNS:
         history[:] = history[-MAX_TURNS:]
 
     time.sleep(COOLDOWN_SECONDS)
 
-    contents = build_context(history, user_message)
-
     language_instruction = LANGUAGE_INSTRUCTION_MAP.get(
         lang_code, "Respond in simple English."
     )
 
-    config = {
-        "system_instruction": SYSTEM_INSTRUCTION + "\n\n" + language_instruction,
-        "max_output_tokens": 200,
-        "temperature": 0.6,
-    }
+    # Build plain-text conversation prompt for Qwen3
+    system_prompt = SYSTEM_INSTRUCTION + "\n\n" + language_instruction
+
+    conv_lines = [system_prompt, ""]
+    for turn in history:
+        if turn["role"] == "user":
+            conv_lines.append(f"User: {turn['text']}")
+        else:
+            conv_lines.append(f"Assistant: {turn['text']}")
+    conv_lines.append(f"User: {user_message}")
+    conv_lines.append("Assistant:")
+
+    full_prompt = "\n".join(conv_lines)
 
     try:
-        response = client.models.generate_content(
-            model=MODEL_NAME,
-            contents=contents,
-            config=config,
-        )
+        url = "http://localhost:11434/api/generate"
+        payload = {
+            "model": MODEL_NAME,
+            "prompt": full_prompt,
+            "stream": False,
+        }
 
-        if hasattr(response, "text") and response.text:
-            return response.text.strip()
+        resp = requests.post(url, json=payload, timeout=120)
+        resp.raise_for_status()
+        data = resp.json()
 
-        if getattr(response, "candidates", None):
-            parts = response.candidates[0].content.parts
-            return "".join(p.text for p in parts if hasattr(p, "text")).strip()
+        text = (data.get("response") or "").strip()
+        if not text:
+            return FALLBACK_MESSAGES.get(
+                lang_code, "I’m taking a short pause. Please try again."
+            )
 
-    except Exception:
+        return text
+
+    except Exception as e:
+        print("Ollama / Qwen error:", repr(e))
         return FALLBACK_MESSAGES.get(
-            lang_code,
-            "I’m taking a short pause. Please try again."
+            lang_code, "I’m taking a short pause. Please try again."
         )
 
 # ================= CLI CHAT =================
@@ -175,7 +172,7 @@ def run_cli_chat():
 
     history.append({
         "role": "user",
-        "text": f"Conversation started at {session_start}."
+        "text": f"Conversation started at {session_start}.",
     })
 
     while True:
@@ -184,7 +181,7 @@ def run_cli_chat():
         if user_message.lower() in {"exit", "quit"}:
             goodbye = {
                 "en": "Take care. Wishing you good health and peace.",
-                "hi": "अपना ध्यान रखें। आपको अच्छे स्वास्थ्य की शुभकामनाएँ।"
+                "hi": "अपना ध्यान रखें। आपको अच्छे स्वास्थ्य की शुभकामनाएँ।",
             }.get(lang_code, "Take care.")
 
             print("\nSeniorCare Ally:", goodbye)
@@ -194,10 +191,10 @@ def run_cli_chat():
         if not user_message:
             continue
 
-        history.append({"role": "user", "text": user_message})
+        history.append({"role": "user", "text": safe_text(user_message)})
 
         reply = ask_senior_care_bot(history, user_message, lang_code)
-        history.append({"role": "model", "text": reply})
+        history.append({"role": "model", "text": safe_text(reply)})
 
         print("\nSeniorCare Ally:", reply, "\n")
         speak_text(reply, lang_code)
@@ -205,6 +202,7 @@ def run_cli_chat():
 # ================= RUN =================
 if __name__ == "__main__":
     run_cli_chat()
+
 
 
 

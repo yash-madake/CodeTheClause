@@ -5,7 +5,46 @@ export const DB = {
     get: (key) => JSON.parse(localStorage.getItem(key)) || null,
     init: () => {
         if (!localStorage.getItem('users')) {
-            localStorage.setItem('users', JSON.stringify([]));
+            // Initialize with demo users
+            const demoUsers = [
+                {
+                    role: 'senior',
+                    seniorId: 'SEN001',
+                    name: 'Ramesh Kumar',
+                    phone: '9876543210',
+                    pin: '1234',
+                    dob: '1950-05-15',
+                    gender: 'Male',
+                    bloodGroup: 'O+',
+                    address: 'Mumbai, Maharashtra',
+                    emergencyPrimary: { name: 'Priya Kumar', contact: '9876543211', relation: 'Daughter' },
+                    emergencyName: 'Priya Kumar',
+                    emergencyPhone: '9876543211',
+                    meds: [
+                        { id: 1, name: "Metformin", type: "Tablet", category: "Daily Routine", dose: "500mg", qty: "1 Tab", stock: 15, expiry: "Dec 2025", schedule: "Morning", instructions: "After Breakfast", taken: false },
+                        { id: 2, name: "Amlodipine", type: "Tablet", category: "Daily Routine", dose: "5mg", qty: "1 Tab", stock: 10, expiry: "Jan 2026", schedule: "Night", instructions: "Before Sleep", taken: false },
+                    ]
+                },
+                {
+                    role: 'doctor',
+                    name: 'Anjali Sharma',
+                    phone: '9876543220',
+                    pin: '5678',
+                    specialization: 'Cardiologist',
+                    regNo: 'MED12345',
+                    clinic: 'City Heart Hospital',
+                    city: 'Mumbai'
+                },
+                {
+                    role: 'caretaker',
+                    name: 'Sunita Devi',
+                    phone: '9876543230',
+                    pin: '9012',
+                    relation: 'Professional Nurse',
+                    address: 'Mumbai'
+                }
+            ];
+            localStorage.setItem('users', JSON.stringify(demoUsers));
         }
     }
 };

@@ -12,6 +12,7 @@ const Sidebar = ({ activeTab, setTab, onLogout, user, isOpen, closeMenu, userRol
     const seniorMenuItems = [
         { id: 'home', icon: 'ph-squares-four', label: 'Dashboard' }, 
         { id: 'assistant', icon: 'ph-robot', label: 'AI Assistant' },
+        { id: 'gps', icon: 'ph-map-pin', label: 'Live GPS' }, // --- ADDED THIS LINE ---
         { id: 'meds', icon: 'ph-pill', label: 'Medicines' },
         { id: 'reports', icon: 'ph-chart-bar', label: 'Reports' },
         { id: 'appointments', icon: 'ph-stethoscope', label: 'Appointments' },
@@ -47,14 +48,14 @@ const Sidebar = ({ activeTab, setTab, onLogout, user, isOpen, closeMenu, userRol
                     </button>
                 </div>
                 
-                <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+                <nav className="flex-1 p-4 space-y-2 overflow-y-auto custom-scroll">
                     {menuItems.map(item => (
                         <button 
                             key={item.id} 
                             onClick={() => { setTab(item.id); closeMenu(); }} 
                             className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all ${
                                 activeTab === item.id 
-                                    ? 'bg-blue-50 text-blue-900 font-bold' 
+                                    ? 'bg-blue-50 text-blue-900 font-bold shadow-sm' 
                                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
                             }`}
                         >

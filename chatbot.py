@@ -1,11 +1,12 @@
 import os
 from datetime import datetime
 from gtts import gTTS
-import playsound
 import uuid
 import time
 import re
-import requests  # NEW: for calling Ollama HTTP API
+import requests
+import io
+import base64
 
 # ================= CONFIG =================
 MODEL_NAME = "qwen3:4b-instruct"   # Ollama model name
@@ -85,16 +86,25 @@ def clean_for_speech(text):
     text = re.sub(r'\s+', ' ', text)
     return text.strip()
 
-def speak_text(text, lang_code):
+def generate_audio_base64(text, lang_code):
+    """
+    Generates audio from text and returns it as a Base64 encoded string.
+    Returns None if generation fails.
+    """
     try:
         clean_text = clean_for_speech(text)
-        filename = f"voice_{uuid.uuid4()}.mp3"
+        if not clean_text:
+            return None
+
         tts = gTTS(text=clean_text, lang=lang_code, slow=False)
-        tts.save(filename)
-        playsound.playsound(filename)
-        os.remove(filename)
-    except Exception:
-        pass  # TTS should never crash the app
+        fp = io.BytesIO()
+        tts.write_to_fp(fp)
+        fp.seek(0)
+        audio_bytes = fp.read()
+        return base64.b64encode(audio_bytes).decode('utf-8')
+    except Exception as e:
+        print(f"TTS Error: {e}")
+        return None
 
 def safe_text(text):
     if not text:
@@ -157,6 +167,7 @@ def ask_senior_care_bot(history, user_message, lang_code):
 def run_cli_chat():
     print("\n=== SeniorCare Ally ===")
     print("A supportive AI companion for seniors and caregivers.\n")
+    print("NOTE: Audio playback is disabled in CLI mode (Backend API mode only).")
 
     print("Available languages:")
     for lang in LANGUAGE_MAP:
@@ -185,7 +196,6 @@ def run_cli_chat():
             }.get(lang_code, "Take care.")
 
             print("\nSeniorCare Ally:", goodbye)
-            speak_text(goodbye, lang_code)
             break
 
         if not user_message:
@@ -197,13 +207,7 @@ def run_cli_chat():
         history.append({"role": "model", "text": safe_text(reply)})
 
         print("\nSeniorCare Ally:", reply, "\n")
-        speak_text(reply, lang_code)
 
 # ================= RUN =================
 if __name__ == "__main__":
     run_cli_chat()
-
-
-
-
-

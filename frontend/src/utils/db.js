@@ -42,6 +42,14 @@ export const DB = {
                     pin: '9012',
                     relation: 'Professional Nurse',
                     address: 'Mumbai'
+                },
+                {
+                    role: 'family',
+                    name: 'Priya Kumar',
+                    phone: '9876543240',
+                    pin: '3456',
+                    relation: 'Daughter',
+                    address: 'Pune, Maharashtra'
                 }
             ];
             localStorage.setItem('users', JSON.stringify(demoUsers));
@@ -89,7 +97,7 @@ export const MockBackend = {
                         sleep: [6.5, 7.0, 5.5, 8.0, 6.2, 7.1],
                         score: [0, 0, 0, 0, 0, 86] 
                     },
-                    reports: [], reminders: [], appointments: [], wellnessLogs: [], customVideos: {} 
+                    reports: [], reminders: [], appointments: [], wellnessLogs: [], customVideos: {}, bookings: []
                 };
                 
                 // Water Reminders

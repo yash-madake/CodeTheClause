@@ -2,7 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { DB } from '../utils/db';
-
+import socket from '../services/socket'; // Import socket
+import Toast from './Toast'; // Reuse your Toast component
 const CaretakerDashboard = () => {
     const { currentUser, logout } = useAuth();
     const [seniorData, setSeniorData] = useState(null);
@@ -27,6 +28,26 @@ const CaretakerDashboard = () => {
             }
         }
     }, []);
+            // ... existing states ...
+        const [emergencyAlert, setEmergencyAlert] = useState(null);
+
+        useEffect(() => {
+            // Listen for SOS events
+            socket.on('receive_sos', (data) => {
+                // Only alert if it matches the senior we are monitoring (Optional security)
+                // For now, we alert on ALL SOS calls for demo purposes
+                setEmergencyAlert(data);
+
+                // Play a sound (browser policy allowing)
+                const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
+                audio.play().catch(e => console.log("Audio play failed", e));
+            });
+
+            // Cleanup on unmount
+            return () => socket.off('receive_sos');
+        }, []);
+
+        
 
     const toggleTask = (taskId) => {
         setTasks(tasks.map(task => 
@@ -54,9 +75,37 @@ const CaretakerDashboard = () => {
         { id: 'emergency', icon: 'ph-siren', label: 'Emergency' }
     ];
 
+    
+
     return (
-        <div className="flex h-screen overflow-hidden bg-slate-50">
+        <div className="flex h-screen overflow-hidden bg-slate-50 relative">
+           {emergencyAlert && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-red-900/90 backdrop-blur-md animate-bounce-in p-4">
+                    <div className="bg-white rounded-3xl p-8 max-w-lg w-full shadow-2xl text-center border-4 border-red-500">
+                        <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
+                            <i className="ph-fill ph-siren text-5xl text-red-600"></i>
+                        </div>
+                        <h2 className="text-3xl font-black text-red-600 mb-2">SOS EMERGENCY!</h2>
+                        <p className="text-xl font-bold text-slate-800 mb-6">{emergencyAlert.seniorName} needs help!</p>
+                        
+                        <div className="bg-red-50 rounded-xl p-4 text-left mb-6 space-y-2">
+                            <p><strong>📍 Location:</strong> {emergencyAlert.location}</p>
+                            <p><strong>⏰ Time:</strong> {emergencyAlert.time}</p>
+                            <p><strong>🆔 ID:</strong> {emergencyAlert.seniorId}</p>
+                        </div>
+
+                        <button 
+                            onClick={() => setEmergencyAlert(null)}
+                            className="w-full py-4 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition shadow-lg text-lg"
+                        >
+                            ACKNOWLEDGE & CLOSE
+                        </button>
+                    </div>
+                </div>
+            )}
+           
             {/* Sidebar */}
+
             <aside className={`absolute inset-y-0 left-0 z-40 w-72 bg-gradient-to-br from-green-900 to-green-700 text-white shadow-2xl transform transition-transform duration-300 md:static md:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-6 border-b border-green-600">
                     <div className="flex items-center justify-between mb-6">

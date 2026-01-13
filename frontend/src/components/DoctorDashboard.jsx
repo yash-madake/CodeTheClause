@@ -2,13 +2,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { DB } from '../utils/db';
-
+import VideoCall from './VideoCall';
 const DoctorDashboard = () => {
     const { currentUser, logout } = useAuth();
     const [seniorData, setSeniorData] = useState(null);
     const [activeSection, setActiveSection] = useState('overview');
     const [sidebarOpen, setSidebarOpen] = useState(false);
-
+    const [activeCall, setActiveCall] = useState(null);
     useEffect(() => {
         // Load senior data based on selectedSeniorId
         const seniorId = sessionStorage.getItem('selectedSeniorId');
@@ -167,11 +167,12 @@ const DoctorDashboard = () => {
                     </div>
 
                     {/* Content Sections */}
+                    {activeCall && (<VideoCall appointmentId={activeCall.id} userName={`Dr. ${currentUser.name}`} onEnd={() => setActiveCall(null)} />)}
                     {activeSection === 'overview' && <OverviewSection seniorData={seniorData} />}
                     {activeSection === 'history' && <MedicalHistorySection seniorData={seniorData} />}
                     {activeSection === 'reports' && <ReportsSection seniorData={seniorData} />}
                     {activeSection === 'prescriptions' && <PrescriptionsSection seniorData={seniorData} />}
-                    {activeSection === 'appointments' && <AppointmentsSection seniorData={seniorData} />}
+                    {activeSection === 'appointments' && <AppointmentsSection seniorData={seniorData} onCall={setActiveCall} />}
                     {activeSection === 'vitals' && <VitalsSection seniorData={seniorData} />}
                 </main>
             </div>

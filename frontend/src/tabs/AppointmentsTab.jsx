@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-
+import { api } from '../services/api'; // Ensure you are using the new API service
+import VideoCall from '../components/VideoCall'; // Import the new component
 // Note: Ensure MockBackend is imported or available in this scope.
 // If using the previous utils, you might need: import { MockBackend } from '../utils/db';
 
@@ -12,7 +13,33 @@ const AppointmentsTab = ({ data, user, refreshData }) => {
         time: '', 
         reason: ''
     });
-
+const AppointmentsSection = ({ seniorData, onCall }) => (
+    <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold text-slate-800">Appointments</h2>
+        </div>
+        
+        {/* Mock Appointments for Demo */}
+        <div className="grid md:grid-cols-2 gap-4">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border-2 border-purple-100 hover:border-purple-300 transition">
+                <div className="flex justify-between items-start mb-4">
+                    <div>
+                        <h3 className="font-bold text-lg text-slate-800">Follow-up Consultation</h3>
+                        <p className="text-sm text-slate-500">Today, 10:00 AM</p>
+                    </div>
+                    <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold">Confirmed</span>
+                </div>
+                
+                <button 
+                    onClick={() => onCall({ id: 101 })} // Mock ID
+                    className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold shadow-lg hover:bg-purple-700 transition flex items-center justify-center gap-2"
+                >
+                    <i className="ph-fill ph-video-camera"></i> Start Video Consultation
+                </button>
+            </div>
+        </div>
+    </div>
+);
     const [timeState, setTimeState] = useState({ hh: '', mm: '', period: 'AM' });
 
     // Sync Time
@@ -120,97 +147,119 @@ const AppointmentsTab = ({ data, user, refreshData }) => {
     // --- RENDER: USER VIEW ---
     return (
         <div className="p-4 md:p-8 space-y-8 fade-in pb-32">
-            {view === 'list' && (
-                <>
-                    <div className="flex justify-between items-center">
-                        <div>
-                            <h1 className="text-2xl font-bold text-slate-800">My Appointments</h1>
-                            <p className="text-slate-500">Track your doctor visits</p>
-                        </div>
-                        <button onClick={() => setView('book')} className="bg-blue-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-800 transition flex items-center gap-2">
-                            <i className="ph-bold ph-plus"></i> Book New
-                        </button>
-                    </div>
 
-                    <div className="space-y-4">
-                        {appointments.filter(a => a.patientId === user.phone).length === 0 ? (
-                            <div className="text-center p-12 bg-white rounded-2xl border border-dashed border-slate-300">
-                                <i className="ph-duotone ph-calendar-x text-4xl text-slate-300 mb-2"></i>
-                                <p className="text-slate-500">No appointments booked yet.</p>
-                            </div>
-                        ) : (
-                            appointments.filter(a => a.patientId === user.phone).map(app => (
-                                <div key={app.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
-                                    <div className={`absolute left-0 top-0 bottom-0 w-2 ${app.status === 'Confirmed' ? 'bg-emerald-500' : app.status === 'Rejected' ? 'bg-red-500' : 'bg-amber-400'}`}></div>
-                                    <div className="pl-4 flex justify-between items-start">
-                                        <div>
-                                            <h3 className="font-bold text-lg text-slate-800">Dr. {app.doctorName}</h3>
-                                            <p className="text-sm text-slate-500 mb-2">{app.specialization}</p>
-                                            <div className="flex flex-wrap gap-2 text-sm">
-                                                <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded"><i className="ph-bold ph-calendar-blank"></i> {app.date}</span>
-                                                <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded"><i className="ph-bold ph-clock"></i> {app.time}</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${app.status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : app.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>{app.status}</span>
-                                            <p className="text-xs text-slate-400 mt-2">ID: #{app.id.toString().slice(-4)}</p>
-                                        </div>
+            {activeCall && (
+                <VideoCall 
+                    appointmentId={activeCall.id} 
+                    userName={user.name} 
+                    onEnd={() => setActiveCall(null)} 
+                />
+            )}
+
+                        
+            {view === 'list' && (
+                            <>
+                                <div className="flex justify-between items-center">
+                                    <div>
+                                        <h1 className="text-2xl font-bold text-slate-800">My Appointments</h1>
+                                        <p className="text-slate-500">Track your doctor visits</p>
                                     </div>
-                                    {app.status === 'Confirmed' && (
-                                        <div className="mt-4 pt-4 border-t text-xs text-slate-500 flex items-center gap-2"><i className="ph-fill ph-bell-ringing text-blue-500"></i> You will be notified 1 hour before.</div>
+                                    <button onClick={() => setView('book')} className="bg-blue-900 text-white px-6 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-800 transition flex items-center gap-2">
+                                        <i className="ph-bold ph-plus"></i> Book New
+                                    </button>
+                                </div>
+
+                                {/* 2. APPOINTMENTS LIST WITH JOIN BUTTON */}
+                                <div className="space-y-4">
+                                    {appointments.filter(a => a.patientId === user.phone).length === 0 ? (
+                                        <div className="text-center p-12 bg-white rounded-2xl border border-dashed border-slate-300">
+                                            <i className="ph-duotone ph-calendar-x text-4xl text-slate-300 mb-2"></i>
+                                            <p className="text-slate-500">No appointments booked yet.</p>
+                                        </div>
+                                    ) : (
+                                        appointments.filter(a => a.patientId === user.phone).map(app => (
+                                            <div key={app.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100 relative overflow-hidden">
+                                                <div className={`absolute left-0 top-0 bottom-0 w-2 ${app.status === 'Confirmed' ? 'bg-emerald-500' : app.status === 'Rejected' ? 'bg-red-500' : 'bg-amber-400'}`}></div>
+                                                <div className="pl-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                                    <div>
+                                                        <h3 className="font-bold text-lg text-slate-800">Dr. {app.doctorName}</h3>
+                                                        <p className="text-sm text-slate-500 mb-2">{app.specialization}</p>
+                                                        <div className="flex flex-wrap gap-2 text-sm">
+                                                            <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded"><i className="ph-bold ph-calendar-blank"></i> {app.date}</span>
+                                                            <span className="flex items-center gap-1 bg-slate-100 px-2 py-1 rounded"><i className="ph-bold ph-clock"></i> {app.time}</span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider ${app.status === 'Confirmed' ? 'bg-emerald-100 text-emerald-700' : app.status === 'Rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                            {app.status}
+                                                        </span>
+                                                        
+                                                        {/* JOIN BUTTON (New Feature) */}
+                                                        {app.status === 'Confirmed' && (
+                                                            <button 
+                                                                onClick={() => setActiveCall(app)}
+                                                                className="bg-purple-600 text-white px-4 py-2 rounded-xl font-bold shadow-md hover:bg-purple-700 transition flex items-center gap-2 animate-pulse"
+                                                            >
+                                                                <i className="ph-fill ph-video-camera"></i> Join Call
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {app.status === 'Confirmed' && (
+                                                    <div className="mt-4 pt-4 border-t text-xs text-slate-500 flex items-center gap-2"><i className="ph-fill ph-bell-ringing text-blue-500"></i> You will be notified 1 hour before.</div>
+                                                )}
+                                            </div>
+                                        ))
                                     )}
                                 </div>
-                            ))
-                        )}
-                    </div>
 
-                    {/* --- eSANJEEVANI HERO SECTION --- */}
-                    <div className="mt-10 relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 text-white shadow-2xl transform transition hover:scale-[1.01] duration-500 group">
-                        <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                        <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500 opacity-10 rounded-full blur-2xl -ml-10 -mb-10"></div>
+                                {/* 3. RESTORED eSANJEEVANI SECTION */}
+                                <div className="mt-10 relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-900 via-purple-900 to-indigo-800 text-white shadow-2xl transform transition hover:scale-[1.01] duration-500 group">
+                                    <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                                    <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500 opacity-10 rounded-full blur-2xl -ml-10 -mb-10"></div>
 
-                        <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row items-center gap-8">
-                            <div className="flex-1 text-center md:text-left">
-                                <div className="inline-flex items-center gap-2 bg-purple-500/20 border border-purple-500/50 text-purple-200 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 backdrop-blur-sm">
-                                    <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> Ministry of Health
-                                </div>
-                                <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
-                                    eSanjeevani <br/>
-                                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-200">National OPD</span>
-                                </h2>
-                                <p className="text-indigo-100 mb-8 text-lg opacity-90 max-w-lg">
-                                    Cannot visit a clinic? Consult specialist doctors from home via <strong>Video Call for FREE</strong>.
-                                </p>
-                                <a href="https://esanjeevani.mohfw.gov.in/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 bg-white text-indigo-900 px-8 py-4 rounded-xl font-bold shadow-lg hover:bg-purple-50 transition-all active:scale-95 group-hover:shadow-purple-500/20">
-                                    <span>Start Free Video Call</span>
-                                    <i className="ph-bold ph-video-camera"></i>
-                                </a>
-                            </div>
+                                    <div className="relative z-10 p-8 md:p-10 flex flex-col md:flex-row items-center gap-8">
+                                        <div className="flex-1 text-center md:text-left">
+                                            <div className="inline-flex items-center gap-2 bg-purple-500/20 border border-purple-500/50 text-purple-200 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider mb-4 backdrop-blur-sm">
+                                                <span className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></span> Ministry of Health
+                                            </div>
+                                            <h2 className="text-3xl md:text-4xl font-bold mb-4 leading-tight">
+                                                eSanjeevani <br/>
+                                                <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-pink-200">National OPD</span>
+                                            </h2>
+                                            <p className="text-indigo-100 mb-8 text-lg opacity-90 max-w-lg">
+                                                Cannot visit a clinic? Consult specialist doctors from home via <strong>Video Call for FREE</strong>.
+                                            </p>
+                                            <a href="https://esanjeevani.mohfw.gov.in/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-3 bg-white text-indigo-900 px-8 py-4 rounded-xl font-bold shadow-lg hover:bg-purple-50 transition-all active:scale-95 group-hover:shadow-purple-500/20">
+                                                <span>Start Free Video Call</span>
+                                                <i className="ph-bold ph-video-camera"></i>
+                                            </a>
+                                        </div>
 
-                            {/* EXPENSE COMPARISON GRAPH */}
-                            <div className="w-full md:w-72 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl">
-                                <h4 className="text-sm font-bold text-center mb-6 opacity-80 uppercase tracking-widest">Consultation Cost</h4>
-                                <div className="flex justify-center items-end gap-6 h-32">
-                                    <div className="w-16 flex flex-col items-center gap-2 group/bar">
-                                        <span className="text-xs font-bold text-white mb-1">₹500+</span>
-                                        <div className="w-full bg-red-400/80 rounded-t-lg h-24 relative group-hover/bar:bg-red-400 transition-colors"></div>
-                                        <span className="text-[10px] opacity-70 text-center">Clinic</span>
-                                    </div>
-                                    <div className="w-16 flex flex-col items-center gap-2 group/bar">
-                                        <span className="text-xs font-bold text-green-300 mb-1">FREE</span>
-                                        <div className="w-full bg-green-400 rounded-t-lg h-6 relative animate-bounce">
-                                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap shadow-lg">
-                                                FREE
+                                        <div className="w-full md:w-72 bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20 shadow-xl">
+                                            <h4 className="text-sm font-bold text-center mb-6 opacity-80 uppercase tracking-widest">Consultation Cost</h4>
+                                            <div className="flex justify-center items-end gap-6 h-32">
+                                                <div className="w-16 flex flex-col items-center gap-2 group/bar">
+                                                    <span className="text-xs font-bold text-white mb-1">₹500+</span>
+                                                    <div className="w-full bg-red-400/80 rounded-t-lg h-24 relative group-hover/bar:bg-red-400 transition-colors"></div>
+                                                    <span className="text-[10px] opacity-70 text-center">Clinic</span>
+                                                </div>
+                                                <div className="w-16 flex flex-col items-center gap-2 group/bar">
+                                                    <span className="text-xs font-bold text-green-300 mb-1">FREE</span>
+                                                    <div className="w-full bg-green-400 rounded-t-lg h-6 relative animate-bounce">
+                                                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded whitespace-nowrap shadow-lg">
+                                                            FREE
+                                                        </div>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold text-green-200 text-center">eSanjeevani</span>
+                                                </div>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] font-bold text-green-200 text-center">eSanjeevani</span>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
-                    </div>
-                </>
-            )}
+                            </>
+                        )}
 
             {view === 'book' && (
                 <div className="max-w-xl mx-auto bg-white rounded-3xl shadow-2xl slide-up overflow-hidden border border-slate-100">

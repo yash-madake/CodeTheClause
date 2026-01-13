@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { DB } from '../utils/db';
 import Toast from './Toast';
-
+import Signup from './Signup'; //
 const RoleBasedLogin = () => {
     const { login } = useAuth();
     const [selectedRole, setSelectedRole] = useState(null);
@@ -11,6 +11,9 @@ const RoleBasedLogin = () => {
     const [toast, setToast] = useState(null);
     const [loading, setLoading] = useState(false);
 
+    const [phone, setPhone] = useState('');
+    const [pin, setPin] = useState('');
+    const [showPin, setShowPin] = useState(false);
     const AUTH_BG_IMAGE = "https://image2url.com/images/1765813364304-04cd83c9-8e5b-410b-a5d0-f4d31263c553.jpg";
     const LOGO_SRC = "https://image2url.com/images/1765805243191-d5f3a19d-770b-41d8-94c1-33d7216f45f0.png";
 

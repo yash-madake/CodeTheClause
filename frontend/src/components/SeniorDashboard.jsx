@@ -6,11 +6,13 @@ import Sidebar from './Sidebar';
 import RightPanel from './RightPanel';
 import HealthScoreCard from './HealthScoreCard';
 import Chart from 'chart.js/auto'; 
-
+import { api } from '../services/api';
+import { useLanguage } from '../contexts/LanguageContext';
 // --- IMPORT ALL FEATURE TABS ---
 import MedicineTab from '../tabs/MedicineTab';
 import ReportsTab from '../tabs/ReportsTab';
 import WellnessTab from '../tabs/WellnessTab';
+import socket from '../services/socket';
 import AppointmentsTab from '../tabs/AppointmentsTab';
 import MedicineShopTab from '../tabs/MedicineShopTab';
 import GovernmentSchemesTab from '../tabs/GovernmentSchemesTab';
@@ -18,7 +20,7 @@ import EmotionalWellnessTab from '../tabs/EmotionalWellnessTab';
 import InsuranceTab from '../tabs/InsuranceTab';
 import AiAssistantTab from '../tabs/AiAssistantTab';
 import GpsTab from '../tabs/GpsTab'; // --- ADDED THIS LINE ---
-
+import { bluetooth } from '../services/bluetooth';
 // ... [Keep Helper Components: ManualEntryModal, NotificationAlert, ChartModal, ProfileTab, DashboardContent unchanged] ...
 
 // --- INTERNAL COMPONENT: PROFILE TAB ---
@@ -221,6 +223,7 @@ const DashboardContent = ({ data, refreshData, user, setTab }) => {
             const formattedHours = hours % 12 || 12; 
             const formattedTime = `${formattedHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')} ${ampm}`;
             
+            const { t, language, setLanguage } = useLanguage();
             const found = data.reminders.find(r => r.day === now.getDate() && r.time === formattedTime && !r.completed && !r.notified);
             if (found) setActiveAlert(found);
 
@@ -273,25 +276,66 @@ const DashboardContent = ({ data, refreshData, user, setTab }) => {
         return () => clearInterval(interval);
     }, [connected]);
 
-    const handleSync = () => {
+const handleSync = async () => {
         setSyncing(true);
-        setTimeout(() => { setConnected(true); setSyncing(false); refreshData(); }, 1500);
-    };
+        
+        try {
+            // 1. Try Real Bluetooth Connection
+            await bluetooth.connect();
+            setConnected(true);
+            
+            // 2. Start Listening to Live Data
+            bluetooth.startStreaming((realHeartRate) => {
+                console.log("Live Heart Rate:", realHeartRate);
+                setLiveHeart(realHeartRate);
+                
+                // Optional: Update Steps/Sleep randomly based on "activity" to simulate other data
+                // since standard BLE monitors often only send Heart Rate.
+                setLiveSteps(prev => prev + Math.floor(Math.random() * 5)); 
+            });
 
-    const handleSOS = () => {
-        if (sosStep === 0) { setSosStep(1); setTimeout(() => setSosStep(0), 3000); } 
-        else { 
-            const contacts = [];
-            if(user.emergencyPrimary?.name) contacts.push(`${user.emergencyPrimary.name} (Family)`);
-            if(user.caretaker?.name) contacts.push(`${user.caretaker.name} (Caretaker)`);
-            if(user.doctor?.name) contacts.push(`${user.doctor.name} (Doctor)`);
+            setSyncing(false);
+            alert("✅ Connected to Health Device!");
 
-            const contactList = contacts.length > 0 ? contacts.join(', ') : "Emergency Services";
-
-            alert(`🚨 SOS ALERT SENT TO ALL CONTACTS!\n\nLocation: ${user.address}\n\nNotifying:\n${contactList}`);
-            setSosStep(0); 
+        } catch (error) {
+            console.warn("Bluetooth failed or cancelled:", error);
+            
+            // 3. Fallback to Simulation if Real Device fails/cancelled
+            if (!connected) {
+                alert("⚠️ Could not connect to real device. Switching to Simulation Mode.");
+                setTimeout(() => { 
+                    setConnected(true); 
+                    setSyncing(false); 
+                    refreshData(); 
+                }, 1000);
+            } else {
+                 setSyncing(false);
+            }
         }
     };
+
+   const handleSOS = () => {
+    if (sosStep === 0) { 
+        setSosStep(1); 
+        setTimeout(() => setSosStep(0), 3000); 
+    } else { 
+        // 1. Prepare Alert Data
+        const alertData = {
+            seniorName: user.name,
+            seniorId: user.seniorId,
+            location: user.address || "Unknown Location",
+            time: new Date().toLocaleTimeString(),
+            message: "Emergency Assistance Required!"
+        };
+
+        // 2. Emit to Backend
+        socket.emit('send_sos', alertData);
+
+        // 3. Show Local Confirmation
+        alert(` SOS ALERT SENT!\n\nNotifying Caretakers & Doctors immediately.`);
+        setSosStep(0); 
+    }
+};
 
     const toggleMed = (id) => {
         const newMeds = data.meds.map(m => {
@@ -371,15 +415,37 @@ const DashboardContent = ({ data, refreshData, user, setTab }) => {
             {editingMetric && <ManualEntryModal metric={editingMetric} onClose={() => setEditingMetric(null)} onSave={handleSaveManual} />}
             {activeAlert && <NotificationAlert reminder={activeAlert} onComplete={completeReminder} onClose={() => setActiveAlert(null)} />}
 
-            <div className="flex justify-between items-center mb-6 gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800">Namaste, {user.name.split(' ')[0]} 🙏</h1>
-                    <p className="text-sm md:text-base text-slate-500">Here's your health summary.</p>
+                    <h1 className="text-2xl md:text-3xl font-bold text-slate-800">
+                        {t('welcome')} {user.name.split(' ')[0]} 🙏
+                    </h1>
+                    <p className="text-sm md:text-base text-slate-500">
+                        {language === 'en' ? "Here's your health summary." : "यहाँ आपका स्वास्थ्य सारांश है।"}
+                    </p>
                 </div>
-                <button onClick={handleSync} className={`shrink-0 flex items-center justify-center gap-2 w-12 h-12 md:w-auto md:h-auto md:px-6 md:py-2.5 rounded-full font-bold shadow-md transition-all ${connected ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-blue-600 text-white hover:bg-blue-700'} ${syncing ? 'animate-pulse' : ''}`}>
-                    <i className={`ph-bold ${connected ? 'ph-bluetooth-connected' : 'ph-bluetooth'} text-xl`}></i> 
-                    <span className="hidden md:inline">{syncing ? 'Syncing...' : connected ? 'Live Sync On' : 'Connect Watch'}</span>
-                </button>
+
+                <div className="flex items-center gap-3">
+                    {/* LANGUAGE SWITCHER */}
+                    <div className="bg-white px-3 py-2 rounded-full shadow-sm border border-slate-200 flex items-center gap-2">
+                        <i className="ph-bold ph-translate text-indigo-600"></i>
+                        <select 
+                            value={language} 
+                            onChange={(e) => setLanguage(e.target.value)}
+                            className="bg-transparent font-bold text-slate-700 outline-none cursor-pointer text-sm"
+                        >
+                            <option value="en">English</option>
+                            <option value="hi">हिंदी</option>
+                            <option value="mr">मराठी</option>
+                        </select>
+                    </div>
+
+                    {/* SYNC BUTTON */}
+                    <button onClick={handleSync} className={`shrink-0 flex items-center justify-center gap-2 w-12 h-12 md:w-auto md:h-auto md:px-6 md:py-2.5 rounded-full font-bold shadow-md transition-all ${connected ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-blue-600 text-white hover:bg-blue-700'} ${syncing ? 'animate-pulse' : ''}`}>
+                        <i className={`ph-bold ${connected ? 'ph-bluetooth-connected' : 'ph-bluetooth'} text-xl`}></i> 
+                        <span className="hidden md:inline">{syncing ? 'Syncing...' : connected ? 'Live Sync On' : 'Connect Watch'}</span>
+                    </button>
+                </div>
             </div>
 
             {/* SOS BLOCK */}
@@ -397,16 +463,12 @@ const DashboardContent = ({ data, refreshData, user, setTab }) => {
             </div>
             
             {/* HEALTH SCORE CARD */}
-            <HealthScoreCard 
+        <HealthScoreCard 
                 data={data} 
                 refreshData={refreshData} 
                 onShowHistory={() => setSelectedMetric('Health Score')} 
                 setLiveScore={setLiveScore}
-                onToggleExercise={() => {
-                    const newData = { ...data, vitals: { ...data.vitals, exercise: !data.vitals.exercise }};
-                    MockBackend.updateData(newData);
-                    refreshData();
-                }}
+                onToggleExercise={handleToggleExercise}
             />
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -517,11 +579,15 @@ const SeniorDashboard = () => {
     const [healthData, setHealthData] = useState(null);
 
     useEffect(() => {
-        MockBackend.initDB();
-        if(currentUser) {
-            MockBackend.saveUser(currentUser);
-            setHealthData(MockBackend.getData());
+        const loadData = async () => {
+            try {
+                const data = await api.getDashboard();
+                setHealthData(data);
+            } catch (err) {
+                console.error("Failed to load dashboard", err);
         }
+    };
+    loadData();
     }, [currentUser]);
 
     const refreshData = () => setHealthData(MockBackend.getData());
@@ -530,6 +596,17 @@ const SeniorDashboard = () => {
         const newReminders = [...healthData.reminders, { id: Date.now(), text, time, day, completed: false }];
         MockBackend.updateData({ ...healthData, reminders: newReminders });
         refreshData();
+    };
+
+    const handleToggleExercise = async () => {
+        try {
+            // Call the real backend API to update status
+            await api.updateVital('exercise', !data.vitals.exercise);
+            // Refresh dashboard data to reflect changes
+            refreshData();
+        } catch (error) {
+            console.error("Failed to toggle exercise:", error);
+        }
     };
 
     const deleteReminder = (id) => {

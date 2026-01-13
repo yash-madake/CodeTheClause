@@ -57,7 +57,11 @@ export const bluetooth = {
     }
 };
 
-// Helper: Decode the standard BLE Heart Rate byte stream
+/**
+ * Decode a BLE Heart Rate Measurement DataView and extract the heart rate value.
+ * @param {DataView} value - The characteristic value buffer for the Heart Rate Measurement.
+ * @returns {number} The heart rate in beats per minute.
+ */
 function parseHeartRate(value) {
     const flags = value.getUint8(0);
     const rate16Bits = flags & 0x1;

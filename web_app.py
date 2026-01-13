@@ -10,6 +10,22 @@ SESSIONS = {}
 
 @app.route("/api/chat", methods=["POST"])
 def chat():
+    """
+    Handle POST /api/chat requests: validate input, generate a chatbot reply in the requested language, persist conversation history for the session, and return the reply.
+    
+    Expects a JSON payload with the keys:
+    - `message` (string): user message to send to the chatbot (required; must not be empty).
+    - `language` (string, optional): user language name; resolves to a language code using the application's language map (defaults to English).
+    - `session_id` (string, optional): identifier for the conversation session (defaults to "default").
+    
+    Returns:
+    A JSON response with the chatbot reply:
+    - On success: `{"reply": "<bot reply>"}` (HTTP 200).
+    - On validation failure when `message` is empty: `{"reply": "", "error": "Empty message"}` (HTTP 400).
+    
+    Side effects:
+    - Appends the user message and the chatbot reply to the in-memory SESSIONS store under the given `session_id`.
+    """
     data = request.get_json() or {}
     user_message = (data.get("message") or "").strip()
     language = (data.get("language") or "english").lower()

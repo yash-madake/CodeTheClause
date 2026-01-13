@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { api } from '../services/api';
 
 const AiAssistantTab = () => {
     const [messages, setMessages] = useState([

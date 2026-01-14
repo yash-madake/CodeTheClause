@@ -1,7 +1,6 @@
 // src/components/RoleBasedLogin.jsx
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { DB } from '../utils/db';
 import Toast from './Toast';
 
 const RoleBasedLogin = () => {
@@ -23,59 +22,20 @@ const RoleBasedLogin = () => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
     };
 
-    const handleLogin = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
         setLoading(true);
 
-        setTimeout(() => {
-            const users = DB.get('users') || [];
-            
-            if (selectedRole === 'senior') {
-                const user = users.find(u => 
-                    u.role === 'senior' && 
-                    u.phone === formData.phone && 
-                    u.pin === formData.pin
-                );
-                
-                if (user) {
-                    showToast(`Welcome back, ${user.name}`, 'success');
-                    setTimeout(() => login(user), 1000);
-                } else {
-                    showToast('Invalid credentials', 'error');
-                    setLoading(false);
-                }
-            } else {
-                if (!formData.seniorId) {
-                    showToast('Senior ID is required', 'error');
-                    setLoading(false);
-                    return;
-                }
-
-                const user = users.find(u => 
-                    u.role === selectedRole && 
-                    u.phone === formData.phone && 
-                    u.pin === formData.pin
-                );
-
-                const senior = users.find(u => 
-                    u.role === 'senior' && 
-                    u.seniorId === formData.seniorId
-                );
-
-                if (user && senior) {
-                    const userWithSenior = { ...user, selectedSeniorId: formData.seniorId };
-                    sessionStorage.setItem('selectedSeniorId', formData.seniorId);
-                    showToast(`Welcome, ${user.name}`, 'success');
-                    setTimeout(() => login(userWithSenior), 1000);
-                } else if (!user) {
-                    showToast('Invalid credentials', 'error');
-                    setLoading(false);
-                } else if (!senior) {
-                    showToast('Senior ID not found', 'error');
-                    setLoading(false);
-                }
-            }
-        }, 1000);
+        console.log('Form data:', formData);
+        console.log('Selected role:', selectedRole);
+        try {
+            await login({ ...formData, role: selectedRole });
+            // The AuthContext will handle navigation on successful login
+        } catch (error) {
+            showToast(error.message, 'error');
+        } finally {
+            setLoading(false);
+        }
     };
 
     // --- UPDATED ROLE CONFIGURATION WITH IMAGES & QUOTES ---

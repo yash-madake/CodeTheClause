@@ -1,21 +1,36 @@
-// backend/server.js
 const express = require('express');
+const dotenv = require('dotenv');
 const cors = require('cors');
-const healthRoutes = require('./routes/healthRoutes');
-const authRoutes = require('./routes/authRoutes'); // Import auth routes
+const connectDB = require('./config/db');
+
+// Load env vars
+dotenv.config({ path: './.env' });
+
+// Connect to database
+connectDB();
 
 const app = express();
-const PORT = 5000;
 
-// Middleware
-app.use(cors()); 
+// Body parser
 app.use(express.json());
 
-// Routes
-app.use('/api/health', healthRoutes);
-app.use('/api/auth', authRoutes); // Register auth routes
+// Enable CORS
+app.use(cors());
 
-// Start Server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+// Mount routers
+const auth = require('./routes/auth');
+app.use('/api/auth', auth);
+
+const PORT = process.env.PORT || 5000;
+
+const server = app.listen(
+  PORT,
+  console.log(`Server running on port ${PORT}`)
+);
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+  console.log(`Error: ${err.message}`);
+  // Close server & exit process
+  server.close(() => process.exit(1));
 });

@@ -70,7 +70,7 @@ A comprehensive **role-based frontend application** for senior care management f
 
 ### 📖 Quick References
 1. **[QUICK_START_GUIDE.md](./QUICK_START_GUIDE.md)**
-   - Demo credentials
+   - Demo credentials in interface
    - Step-by-step testing instructions
    - Key features to test
 
